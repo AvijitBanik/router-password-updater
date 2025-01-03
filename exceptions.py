@@ -8,3 +8,7 @@ class CanNotNavigateToProfileConfigError(Exception):
 
 class CanNotSetNewPasswordError(Exception):
     pass
+
+
+class EnableChannelError(Exception):
+    pass

@@ -14,6 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from exceptions import (
     CanNotLoginToRouterError,
+    CanNotLogoutToRouterError,
     CanNotNavigateToProfileConfigError,
     CanNotSetNewPasswordError,
     EnableChannelError,
@@ -100,7 +101,7 @@ class RouterNavigate:
         if netwok_element:
             netwok_element.click()
 
-        # Find the Wireless in menu and click it
+        # Find the Wireless optoin in the dropdown and click it
         wireless_element = driver.find_element(By.ID, "tf1_network_accessPoints")
         WebDriverWait(driver, 1).until(EC.element_to_be_clickable(wireless_element))
         if wireless_element:
@@ -152,9 +153,13 @@ class RouterNavigate:
 
 
 # set new password
-def set_new_password(driver: webdriver.Chrome, actions: ActionChains):
-    password = NEW_PASSWORD
-    RouterNavigate.to_profile_config(driver, actions, channel=ROUTER_CHANNEL)
+def set_new_password(
+    driver: webdriver.Chrome,
+    actions: ActionChains,
+    password: str = NEW_PASSWORD,
+    channel: int = ROUTER_CHANNEL,
+):
+    RouterNavigate.to_profile_config(driver, actions, channel=channel)
 
     # Find the password field
     password_field = driver.find_element(By.ID, "tf1_txtWPAPasswd")
@@ -189,7 +194,12 @@ def set_new_password(driver: webdriver.Chrome, actions: ActionChains):
 
 
 # enables channel
-def enable_channel(driver: webdriver.Chrome, actions: ActionChains):
+def enable_channel(
+    driver: webdriver.Chrome,
+    actions: ActionChains,
+    channel: int = ROUTER_CHANNEL,
+    enable: bool = ENABLE_CHANNEL,
+):
     def common_op(id: str):
         # Right click on the channel
         actions.context_click(channel_x).perform()
@@ -205,31 +215,59 @@ def enable_channel(driver: webdriver.Chrome, actions: ActionChains):
                     (By.CSS_SELECTOR, "#main > div.msgInfo"), "Operation succeeded"
                 )
             )
-            print(
-                f"Channel {'Enabled' if ENABLE_CHANNEL else 'Disabled'} successfully ...!"
-            )
+            print(f"Channel {'Enabled' if enable else 'Disabled'} successfully ...!")
         except TimeoutException as e:
-            print(f"Channel {'Enable' if ENABLE_CHANNEL else 'Disable'} failed ...!")
+            print(f"Channel {'Enable' if enable else 'Disable'} failed ...!")
             raise EnableChannelError(
-                f"function enable_channel() could not {'enable' if ENABLE_CHANNEL else 'disable'} the channel."
+                f"function enable_channel() could not {'enable' if enable else 'disable'} the channel."
             ) from e
 
     RouterNavigate.to_wireless(driver)
 
     # Find the channel and get the status
-    channel_x = driver.find_element(By.XPATH, f'//*[@id="{ROUTER_CHANNEL}"]/td[1]')
+    channel_x = driver.find_element(By.XPATH, f'//*[@id="{channel}"]/td[1]')
     if channel_x:
         is_enable = "enableIcon sorting_1" in channel_x.get_attribute("class")
 
-    if ENABLE_CHANNEL and not is_enable:
+    if enable and not is_enable:
         common_op("enableMenu")
-    elif not ENABLE_CHANNEL and is_enable:
+    elif not enable and is_enable:
         common_op("disableMenu")
     else:
         RouterNavigate.to_dashboard(driver)
 
 
-# TODO: create a logout function
+def logout_from_router(driver: webdriver.Chrome, actions: ActionChains):
+    # find the logout dropdown label and content
+    logout_dropdown_label = driver.find_element(By.ID, "lblLoggedinUser")
+    logout_dropdown_content = driver.find_element(By.ID, "tf1_logoutAnchor")
+
+    # move to the logout dropdown label and click the content
+    if logout_dropdown_label and logout_dropdown_content:
+        actions.move_to_element(logout_dropdown_label).perform()
+        logout_dropdown_content.click()
+
+    # find the logout ok button and click it
+    logout_ok_button = driver.find_element(
+        By.XPATH, '//*[@id="tf1_logOutContent"]/div/a[2]'
+    )
+    if logout_ok_button:
+        logout_ok_button.click()
+
+    # wait for the logout to be successful or check if the operation was successful
+    try:
+        WebDriverWait(driver, 5).until(
+            EC.text_to_be_present_in_element(
+                (By.XPATH, "/html/body/div[1]/div/div/div[2]/form/div/div[5]/button"),
+                "Login",
+            )
+        )
+        print("Logout successful ...!")
+    except TimeoutException as e:
+        print("Logout failed ...!")
+        raise CanNotLogoutToRouterError(
+            "function logout_from_router() could not logout from the router-dashboard."
+        ) from e
 
 
 def main():
@@ -241,6 +279,7 @@ def main():
         login_to_router(driver)
         set_new_password(driver, actions)
         enable_channel(driver, actions)
+        logout_from_router(driver, actions)
     except WebDriverException as e:
         print(f"General Web Driver Exception Error: {e}")
     except CanNotLoginToRouterError as e:
@@ -251,6 +290,8 @@ def main():
         print(f"Can not Set New Password Error: {e}")
     except EnableChannelError as e:
         print(f"Can not Enable Channel Error: {e}")
+    except CanNotLogoutToRouterError as e:
+        print(f"Can not Logout from router Error: {e}")
     finally:
         # Close the browser
         if not debugging:

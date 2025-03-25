@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 from pathlib import Path
 
@@ -38,7 +39,8 @@ except ValueError as e:
 
 # Path to the ChromeDriver executable
 script_directory = Path(__file__).resolve().parent
-chrome_driver_path = script_directory / "chromedriver-win64" / "chromedriver.exe"
+if platform.system().lower() == "windows":
+    chrome_driver_path = script_directory / "chromedriver-win64" / "chromedriver.exe"
 
 # Set up Chrome service and options
 service = Service(chrome_driver_path)
@@ -277,9 +279,9 @@ def main():
 
     try:
         login_to_router(driver)
-        set_new_password(driver, actions)
-        enable_channel(driver, actions)
-        logout_from_router(driver, actions)
+        # set_new_password(driver, actions)
+        # enable_channel(driver, actions)
+        # logout_from_router(driver, actions)
     except WebDriverException as e:
         print(f"General Web Driver Exception Error: {e}")
     except CanNotLoginToRouterError as e:
